@@ -1,0 +1,18 @@
+FINAL SELECTED FEATURES FOR ENDOMETRIOSIS RISK MODEL
+=======================================================
+
+1. Heavy / Extreme menstrual bleeding
+2. Menstrual pain (Dysmenorrhea)
+3. Pelvic pain
+4. Painful bowel movements
+5. Infertility
+6. Painful cramps during period
+7. Fatigue / Chronic fatigue
+8. Ovarian cysts
+9. IBS-like symptoms
+10. Excessive bleeding
+11. Bowel pain
+12. Cysts (unspecified)
+13. Abnormal uterine bleeding
+14. Fever
+15. Loss of appetite
