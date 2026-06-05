@@ -326,7 +326,12 @@ plt.close()
 print(">> Saved: plot_D_ablation.png")
 
 # Plot E: Confusion Matrices
-best_name = sorted(results.items(), key=lambda x: x[1]['test_auc'], reverse=True)[0][0]
+single_models = {k:v for k,v in results.items()
+                 if k != "Hybrid Ensemble"}
+
+best_name = sorted(single_models.items(),
+                   key=lambda x: x[1]['sens'],
+                   reverse=True)[0][0]
 fig, axes = plt.subplots(1, 2, figsize=(11, 4))
 for ax_i, name in zip(axes, [best_name, "Hybrid Ensemble"]):
     cm = confusion_matrix(y_test, results[name]['y_pred'])
