@@ -12,6 +12,7 @@ import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
 import joblib
+
 from sklearn.ensemble import (AdaBoostClassifier, RandomForestClassifier,
                                VotingClassifier, GradientBoostingClassifier)
 from sklearn.linear_model import LogisticRegression
@@ -24,7 +25,7 @@ from sklearn.metrics import (roc_auc_score, accuracy_score, f1_score,
 from xgboost import XGBClassifier
 
 # ── 0. LOAD DATA ─────────────────────────────────────────────
-DATA_PATH = "dataset__1_.xlsx"   # <-- change path if needed
+DATA_PATH = "considerable dataset.xlsx"   # <-- change path if needed
 df = pd.read_excel(DATA_PATH)
 
 EXCLUDE_COLS = ['Unnamed: 0', 'row', 'label']
@@ -187,8 +188,8 @@ for gname, gfeats in symptom_groups.items():
         print(f"    - {f}")
 
 print("\n\nAblation results using XGBoost:")
-print(f"\n{'Feature Group':<35} {'# Feats':>7} {'CV-AUC':>8} {'Test-AUC':>9} {'F1':>7}")
-print("-" * 70)
+print(f"\n{'Feature Group':<35} {'# Feats':>7} {'CV-AUC':>8} {'Test-AUC':>9} {'Acc':>7} {'Recall':>7} {'Spec':>7} {'F1':>7}")
+print("-" * 95)
 
 ablation_results = {}
 
@@ -211,9 +212,16 @@ for gname, gfeats in symptom_groups.items():
     f1_t  = f1_score(yg_te, yg_pred)
     cv_t  = cross_val_score(xgb, Xg, y, cv=cv, scoring='roc_auc').mean()
 
-    ablation_results[gname] = {'cv_auc': cv_t, 'test_auc': auc_t, 'f1': f1_t, 'n': len(gfeats)}
+    cm_t   = confusion_matrix(yg_te, yg_pred)
+    tn_t, fp_t, fn_t, tp_t = cm_t.ravel()
+    rec_t  = tp_t / (tp_t + fn_t)
+    spec_t = tn_t / (tn_t + fp_t)
+    acc_t  = accuracy_score(yg_te, yg_pred)
+    ablation_results[gname] = {'cv_auc': cv_t, 'test_auc': auc_t, 'f1': f1_t, 'n': len(gfeats),
+                            'acc': acc_t, 'recall': rec_t, 'spec': spec_t,
+                            'tp': int(tp_t), 'fn': int(fn_t), 'tn': int(tn_t), 'fp': int(fp_t)}
     tag = " ← BASELINE" if gname == "All 15 Features (Baseline)" else ""
-    print(f"  {gname:<33} {len(gfeats):>7} {cv_t:>8.4f} {auc_t:>9.4f} {f1_t:>7.4f}{tag}")
+    print(f"  {gname:<33} {len(gfeats):>7} {cv_t:>8.4f} {auc_t:>9.4f} {acc_t:>7.4f} {rec_t:>7.4f} {spec_t:>7.4f} {f1_t:>7.4f}{tag}")
 
 # ── 6. PLOTS ─────────────────────────────────────────────────
 
@@ -345,12 +353,14 @@ plt.close()
 print(">> Saved: plot_E_confusion.png")
 
 # ── 7. FINAL SUMMARY ─────────────────────────────────────────
-xgb_model = models["XGBoost"]
-joblib.dump(xgb_model, "femcare_xgboost_model.pkl")
-print(">> Saved: femcare_xgboost_model.pkl")
 
-joblib.dump(final_features, "femcare_feature_list.pkl")
-print(">> Saved: femcare_feature_list.pkl")
+
+xgb_model = models["XGBoost"]
+joblib.dump(xgb_model, "femcare_xgboost_model.py")
+print(">> Saved: femcare_xgboost_model.py")
+
+joblib.dump(final_features, "femcare_feature_list.py")
+print(">> Saved: femcare_feature_list.py")
 
 pipeline = {
     "model":    xgb_model,
@@ -359,8 +369,8 @@ pipeline = {
     "n_features": len(final_features),
     "threshold": 0.5,
 }
-joblib.dump(pipeline, "femcare_full_pipeline.pkl")
-print(">> Saved: femcare_full_pipeline.pkl")
+joblib.dump(pipeline, "femcare_full_pipeline.py")
+print(">> Saved: femcare_full_pipeline.py")
 print("\n" + "=" * 65)
 print("FINAL SUMMARY")
 print("=" * 65)
