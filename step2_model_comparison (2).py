@@ -11,7 +11,7 @@ import matplotlib.patches as mpatches
 import seaborn as sns
 import warnings
 warnings.filterwarnings('ignore')
-
+import joblib
 from sklearn.ensemble import (AdaBoostClassifier, RandomForestClassifier,
                                VotingClassifier, GradientBoostingClassifier)
 from sklearn.linear_model import LogisticRegression
@@ -345,6 +345,22 @@ plt.close()
 print(">> Saved: plot_E_confusion.png")
 
 # ── 7. FINAL SUMMARY ─────────────────────────────────────────
+xgb_model = models["XGBoost"]
+joblib.dump(xgb_model, "femcare_xgboost_model.pkl")
+print(">> Saved: femcare_xgboost_model.pkl")
+
+joblib.dump(final_features, "femcare_feature_list.pkl")
+print(">> Saved: femcare_feature_list.pkl")
+
+pipeline = {
+    "model":    xgb_model,
+    "features": final_features,
+    "model_name": "XGBoost",
+    "n_features": len(final_features),
+    "threshold": 0.5,
+}
+joblib.dump(pipeline, "femcare_full_pipeline.pkl")
+print(">> Saved: femcare_full_pipeline.pkl")
 print("\n" + "=" * 65)
 print("FINAL SUMMARY")
 print("=" * 65)
