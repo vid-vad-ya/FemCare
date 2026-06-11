@@ -30,7 +30,6 @@ CV_FOLDS    = 5
 
 # The 15 features from your Step 1 feature selection
 FEATURES = [
-    "Ovarian cysts",
     "Menstrual pain (Dysmenorrhea)",
     "Abnormal uterine bleeding",
     "Pelvic pain",
