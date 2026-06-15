@@ -14,9 +14,7 @@ from sklearn.model_selection import train_test_split
 import warnings
 warnings.filterwarnings('ignore')
 
-# ── 0. LOAD DATA ─────────────────────────────────────────────
-# Make sure your dataset file is in the same folder as this script
-# OR change the path below to the full path of your file
+
 DATA_PATH = "considerable dataset.xlsx"
 
 df = pd.read_excel(DATA_PATH)
@@ -208,7 +206,4 @@ plt.close()
 print(">> Saved: plot3_final_features.png")
 print()
 
-print("=" * 60)
-print("STEP 1 COMPLETE")
-print("Next step: Run step2_xgboost_model.py")
-print("=" * 60)
+
