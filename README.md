@@ -84,9 +84,12 @@ The risk scoring model is an AdaBoost classifier trained on **886 patient record
 
 | Metric | Score |
 |---|---|
+| AUC Test | 0.9585 |
 | Cross-validated AUC | 0.9406 |
-| Sensitivity (recall) | 80.7% |
+| Sensitivity (recall) | 89.1% |
 | Specificity | 87.4% |
+| Accuracy | 88.3% |
+| F1 Score | 89.08% |
 | Endometriosis cases found | 96 / 119 |
 
 Feature importance and per-prediction explanations are generated using **SHAP (SHapley Additive exPlanations)**, which identifies which symptoms are driving each individual score.
