@@ -6,7 +6,7 @@ try:
         port     = 5432,
         dbname   = "femcare_db",
         user     = "postgres",
-        password = "yourpassword"    # ← type your actual postgres password here
+        password = "KAVIYA"    # ← type your actual postgres password here
     )
     print("✓ Connected to femcare_db successfully!")
     conn.close()
