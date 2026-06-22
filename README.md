@@ -197,7 +197,7 @@ Open `http://localhost:5173` in your browser.
 
 ## Disclaimer
 
-FemCare is a research and educational screening tool. It is **not a medical device** and does not provide clinical diagnoses. The risk score reflects statistical patterns in symptom data — it does not confirm or exclude endometriosis. Always share your results with a qualified healthcare professional.
+FemCare is a research and educational screening tool. It is **does not provide clinical diagnoses**. The risk score reflects statistical patterns in symptom data — it does not confirm or exclude endometriosis. Always share your results with a qualified healthcare professional.
 
 ---
 
