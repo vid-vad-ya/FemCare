@@ -1,5 +1,7 @@
 # 🌸 FemCare — Early Endometriosis Risk Screening Tool
 
+![Femcare Page](images/femcare.jpeg)
+
 FemCare is a free, clinically-informed web application that helps women identify whether their symptoms may be consistent with endometriosis. Users answer a short questionnaire about their symptoms and receive a personalised risk report — including a risk score, risk tier, and the specific symptoms contributing most to their result.
 
 > ⚠️ **This is a screening tool, not a medical diagnosis.** FemCare cannot confirm or rule out endometriosis. Always consult a qualified gynaecologist with your results.
