@@ -90,7 +90,7 @@ The risk scoring model is an AdaBoost classifier trained on **886 patient record
 | Specificity | 89.32% |
 | Accuracy | 88.3% |
 | F1 Score | 88.89% |
-| Endometriosis cases found | 96 / 119 |
+
 
 Feature importance and per-prediction explanations are generated using **SHAP (SHapley Additive exPlanations)**, which identifies which symptoms are driving each individual score.
 
