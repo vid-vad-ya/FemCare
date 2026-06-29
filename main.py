@@ -47,9 +47,9 @@ app.add_middleware(
 # femcare_features.txt is the source of truth.
 # FEATURES list order must be preserved exactly.
 # ─────────────────────────────────────────────
-model     = joblib.load("femcare_model_final.pkl")
+model     = joblib.load("femcare_model.pkl")
 try:
-    explainer = joblib.load("Femcares_explainer_final.pkl")
+    explainer = joblib.load("femcare_explainer.pkl")
 except Exception as e:
     print("Explainer load failed:", e)
     explainer = None
@@ -266,6 +266,7 @@ def predict(data: PredictRequest, user_id: str = Depends(get_current_user_option
     # Run model
     input_df = pd.DataFrame([symptom_inputs])[FEATURES]
     prob     = float(model.predict_proba(input_df)[0][1])
+    prediction = int(prob >= THRESHOLD) 
     tier     = risk_tier(prob)
 
     # Run SHAP

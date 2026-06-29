@@ -1,232 +1,413 @@
-# ============================================================
-# ENDOMETRIOSIS RISK SCREENING — STEP 2B: ADABOOST + SHAP
-# Comparing AdaBoost vs XGBoost on the same 14 features
-# Includes threshold tuning (Youden Index) for sensitivity
-# ============================================================
+"""
+FemCare — XGBoost + SHAP Pipeline
+Covers: Training → Validation → Explainability
+"""
 
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import warnings
-warnings.filterwarnings('ignore')
+warnings.filterwarnings("ignore")
 
-from sklearn.ensemble import AdaBoostClassifier
-from sklearn.model_selection import train_test_split, cross_val_score, StratifiedKFold
-from sklearn.metrics import (accuracy_score, roc_auc_score, confusion_matrix,
-                             classification_report, roc_curve, f1_score,
-                             recall_score, precision_score)
+from sklearn.model_selection import train_test_split, StratifiedKFold, cross_val_score
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import (
+    roc_auc_score, roc_curve, confusion_matrix,
+    accuracy_score, f1_score, classification_report
+)
+from xgboost import XGBClassifier
 import shap
 
-# ── 0. LOAD DATA ─────────────────────────────────────────────
-DATA_PATH = "considerable dataset.xlsx"
+# ─────────────────────────────────────────────
+# 0. CONFIGURATION — edit these if needed
+# ─────────────────────────────────────────────
+DATA_PATH   = "D:\practice\dataset (1).xlsx"   # your Excel file
+TARGET_COL  = "label"          # 0 / 1 column
+RANDOM_SEED = 42
+TEST_SIZE   = 0.25                     # 75-25 split (same as before)
+CV_FOLDS    = 5
+
+# The 15 features from your Step 1 feature selection
+FEATURES = [
+    "Menstrual pain (Dysmenorrhea)",
+    "Abnormal uterine bleeding",
+    "Pelvic pain",
+    "Cysts (unspecified)",
+    "Fever",
+    "Infertility",
+    "Nausea",
+    "Constipation / Chronic constipation",
+    "Abdominal Cramps during Intercourse",
+    "Irregular / Missed periods",
+    "Lower back pain",
+    "Bloating",
+    "Decreased energy / Exhaustion",
+    "Diarrhea"
+]
+
+# Risk tier thresholds (probability → label)
+def risk_tier(prob):
+    if prob >= 0.80:
+        return "Urgent"
+    elif prob >= 0.60:
+        return "High"
+    elif prob >= 0.40:
+        return "Moderate"
+    else:
+        return "Low"
+
+# ─────────────────────────────────────────────
+# 1. LOAD DATA
+# ─────────────────────────────────────────────
+print("=" * 60)
+print("FEMCARE — XGBoost + SHAP Pipeline")
+print("=" * 60)
+
 df = pd.read_excel(DATA_PATH)
+print(f"\n✓ Dataset loaded: {df.shape[0]} patients, {df.shape[1]} columns")
 
-# ── 1. LOAD FINAL 14 FEATURES (from your existing pipeline) ──
-with open('final_features.txt', 'r') as f:
-    lines = f.readlines()
+# Encode target if it's a string
+if df[TARGET_COL].dtype == object:
+    le = LabelEncoder()
+    df[TARGET_COL] = le.fit_transform(df[TARGET_COL])
 
-FINAL_FEATURES = []
-for line in lines:
-    line = line.strip()
-    if line and line[0].isdigit():
-        feature_name = line.split('. ', 1)[1].strip()
-        FINAL_FEATURES.append(feature_name)
+X = df[FEATURES]
+y = df[TARGET_COL]
 
-# NOTE: If "Ovarian Cysts" is still in this list from an earlier run,
-# remove it manually here since it was excluded in the final model:
-FINAL_FEATURES = [f for f in FINAL_FEATURES if 'Ovarian' not in f]
+pos = y.sum()
+neg = len(y) - pos
+print(f"  ├─ Endometriosis positive : {pos}")
+print(f"  └─ Endometriosis negative : {neg}")
 
-print("=" * 60)
-print(f"USING {len(FINAL_FEATURES)} FEATURES")
-print("=" * 60)
-for i, f in enumerate(FINAL_FEATURES):
-    print(f"  {i+1:2}. {f}")
-print()
-
-X = df[FINAL_FEATURES]
-y = df['label']
-
+# ─────────────────────────────────────────────
+# 2. TRAIN / TEST SPLIT
+# ─────────────────────────────────────────────
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.25, random_state=42, stratify=y
+    X, y,
+    test_size=TEST_SIZE,
+    stratify=y,
+    random_state=RANDOM_SEED
 )
+print(f"\n✓ Split: {len(X_train)} train / {len(X_test)} test (stratified)")
 
+# ─────────────────────────────────────────────
+# 3. XGBOOST MODEL
+# ─────────────────────────────────────────────
+# scale_pos_weight handles class imbalance automatically
+spw = neg / pos
 
-# ── 2. TRAIN ADABOOST ─────────────────────────────────────────
-print("=" * 60)
-print("TRAINING ADABOOST")
-print("=" * 60)
-
-ada_model = AdaBoostClassifier(
+model = XGBClassifier(
     n_estimators=100,
-    learning_rate=0.5,
+    eval_metric='logloss',
     random_state=42
 )
-ada_model.fit(X_train, y_train)
 
-y_prob_ada = ada_model.predict_proba(X_test)[:, 1]
-y_pred_ada = ada_model.predict(X_test)
+# ─────────────────────────────────────────────
+# 4. CROSS-VALIDATION
+# ─────────────────────────────────────────────
+print("\n── 5-Fold Cross Validation ──")
+skf = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_SEED)
+cv_scores = cross_val_score(model, X_train, y_train, cv=skf, scoring="roc_auc")
 
-acc_ada = accuracy_score(y_test, y_pred_ada)
-auc_ada = roc_auc_score(y_test, y_prob_ada)
-sens_ada = recall_score(y_test, y_pred_ada)
-spec_ada = recall_score(y_test, y_pred_ada, pos_label=0)
-f1_ada = f1_score(y_test, y_pred_ada)
+print(f"  Fold AUCs : {[round(s, 4) for s in cv_scores]}")
+print(f"  CV-AUC    : {cv_scores.mean():.4f} ± {cv_scores.std():.4f}")
 
-print(f"AdaBoost @ default threshold (0.5):")
-print(f"  Accuracy    : {acc_ada:.4f}")
-print(f"  AUC         : {auc_ada:.4f}")
-print(f"  Sensitivity : {sens_ada:.4f}")
-print(f"  Specificity : {spec_ada:.4f}")
-print(f"  F1 Score    : {f1_ada:.4f}")
-print()
+# ─────────────────────────────────────────────
+# 5. FINAL TRAINING ON FULL TRAIN SET
+# ─────────────────────────────────────────────
+model.fit(X_train, y_train)
+print(f"\n✓ Model trained on {len(X_train)} patients")
 
-# 5-fold CV
-cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
-cv_scores_ada = cross_val_score(ada_model, X, y, cv=cv, scoring='roc_auc')
-print(f"5-Fold CV-AUC: {cv_scores_ada.mean():.4f} ± {cv_scores_ada.std():.4f}")
-print()
+# ─────────────────────────────────────────────
+# 6. TEST SET VALIDATION
+# ─────────────────────────────────────────────
+y_prob = model.predict_proba(X_test)[:, 1]
+y_pred = (y_prob >= 0.5).astype(int)
 
+auc      = roc_auc_score(y_test, y_prob)
+acc      = accuracy_score(y_test, y_pred)
+f1       = f1_score(y_test, y_pred)
+cm       = confusion_matrix(y_test, y_pred)
+tn, fp, fn, tp = cm.ravel()
+sensitivity = tp / (tp + fn)      # recall
+specificity = tn / (tn + fp)
 
-# ── 3. THRESHOLD TUNING (YOUDEN INDEX) ───────────────────────
+print("\n── Test Set Results ──")
+print(f"  AUC (Test)    : {auc:.4f}")
+print(f"  CV-AUC        : {cv_scores.mean():.4f}")
+print(f"  Accuracy      : {acc:.4f}")
+print(f"  F1 Score      : {f1:.4f}")
+print(f"  Sensitivity   : {sensitivity:.4f}  (Recall — endo patients found)")
+print(f"  Specificity   : {specificity:.4f}  (Healthy patients correctly cleared)")
+print(f"\n  Confusion Matrix:")
+print(f"                  Pred: No Endo   Pred: Endo")
+print(f"  Actual: No Endo    TN={tn:<6}      FP={fp}")
+print(f"  Actual: Endo       FN={fn:<6}      TP={tp}")
+print(f"\n  Out of {tp + fn} confirmed endo patients:")
+print(f"    ✓ Found  : {tp}  ({sensitivity*100:.1f}%)")
+print(f"    ✗ Missed : {fn}  ({fn/(tp+fn)*100:.1f}%)")
+
+print("\n── Classification Report ──")
+print(classification_report(y_test, y_pred, target_names=["No Endo", "Endo"]))
+
+# ─────────────────────────────────────────────
+# 7. SHAP EXPLAINABILITY
+# ─────────────────────────────────────────────
+print("\n── Running SHAP (TreeExplainer) ──")
+
+# Fix for XGBoost/SHAP version mismatch — base_score stored as string in newer XGBoost
+
+explainer   = shap.TreeExplainer(model)
+shap_values = explainer(X_test)          # returns Explanation object
+sv_matrix   = shap_values.values         # shape: (n_test, n_features)
+
+print(f"  ✓ SHAP values computed for {len(X_test)} patients × {len(FEATURES)} features")
+
+# ─────────────────────────────────────────────
+# 8. PLOTS
+# ─────────────────────────────────────────────
+plt.style.use("seaborn-v0_8-whitegrid")
+PINK   = "#C2185B"
+LIGHT  = "#FCE4EC"
+DARK   = "#880E4F"
+
+# ── 8a. SHAP Summary (Bar) — global feature importance
+print("\n── Generating plots ──")
+fig, ax = plt.subplots(figsize=(9, 6))
+shap.summary_plot(shap_values, X_test, plot_type="bar",
+                  color=PINK, show=False)
+plt.title("Global Feature Importance (mean |SHAP value|)", fontsize=13, pad=12)
+plt.tight_layout()
+plt.savefig("shap_importance_bar.png", dpi=150, bbox_inches="tight")
+plt.close()
+print("  ✓ shap_importance_bar.png")
+
+# ── 8b. SHAP Beeswarm — direction + magnitude
+fig, ax = plt.subplots(figsize=(10, 7))
+shap.summary_plot(shap_values, X_test, show=False)
+plt.title("SHAP Beeswarm — Feature Impact Direction & Magnitude", fontsize=13, pad=12)
+plt.tight_layout()
+plt.savefig("shap_beeswarm.png", dpi=150, bbox_inches="tight")
+plt.close()
+print("  ✓ shap_beeswarm.png")
+
+# ── 8c. Confusion Matrix heatmap
+fig, ax = plt.subplots(figsize=(5, 4))
+sns.heatmap(cm, annot=True, fmt="d", cmap="RdPu",
+            xticklabels=["No Endo", "Endo"],
+            yticklabels=["No Endo", "Endo"],
+            linewidths=1, ax=ax)
+ax.set_xlabel("Predicted", fontsize=11)
+ax.set_ylabel("Actual", fontsize=11)
+ax.set_title("Confusion Matrix — XGBoost", fontsize=12)
+plt.tight_layout()
+plt.savefig("confusion_matrix.png", dpi=150, bbox_inches="tight")
+plt.close()
+print("  ✓ confusion_matrix.png")
+
+# ── 8d. ROC Curve
+fpr, tpr, _ = roc_curve(y_test, y_prob)
+fig, ax = plt.subplots(figsize=(6, 5))
+ax.plot(fpr, tpr, color=PINK, lw=2, label=f"XGBoost (AUC = {auc:.4f})")
+ax.plot([0, 1], [0, 1], "k--", lw=1, label="Random Chance")
+ax.fill_between(fpr, tpr, alpha=0.08, color=PINK)
+ax.set_xlabel("False Positive Rate", fontsize=11)
+ax.set_ylabel("True Positive Rate (Sensitivity)", fontsize=11)
+ax.set_title("ROC Curve — XGBoost", fontsize=12)
+ax.legend(loc="lower right")
+plt.tight_layout()
+plt.savefig("roc_curve.png", dpi=150, bbox_inches="tight")
+plt.close()
+print("  ✓ roc_curve.png")
+
+# ── 8e. Waterfall for one sample patient (highest risk)
+top_idx = int(np.argmax(y_prob))
+fig, ax = plt.subplots(figsize=(9, 6))
+shap.plots.waterfall(shap_values[top_idx], show=False)
+plt.title(f"SHAP Waterfall — Patient #{top_idx} "
+          f"(Risk: {y_prob[top_idx]*100:.1f}% | "
+          f"{'Endo ✓' if y_test.iloc[top_idx]==1 else 'No Endo'})",
+          fontsize=11, pad=10)
+plt.tight_layout()
+plt.savefig("shap_waterfall_sample.png", dpi=150, bbox_inches="tight")
+plt.close()
+print(f"  ✓ shap_waterfall_sample.png  (sample = patient #{top_idx})")
+
+# ─────────────────────────────────────────────
+# 9. PER-PATIENT EXPLAINABILITY REPORT
+# ─────────────────────────────────────────────
+print("\n── Building per-patient report ──")
+
+records = []
+for i in range(len(X_test)):
+    row       = X_test.iloc[i]
+    prob      = y_prob[i]
+    tier      = risk_tier(prob)
+    actual    = int(y_test.iloc[i])
+    shap_row  = sv_matrix[i]                          # SHAP values for this patient
+
+    # Top 3 contributing symptoms (by absolute SHAP value)
+    ranked    = sorted(zip(FEATURES, shap_row), key=lambda x: abs(x[1]), reverse=True)
+    top3      = [(f, round(v * 100, 2)) for f, v in ranked[:3]]
+
+    record = {
+        "patient_index" : X_test.index[i],
+        "risk_pct"      : round(prob * 100, 1),
+        "risk_tier"     : tier,
+        "actual_label"  : "Endo" if actual == 1 else "No Endo",
+        "correct"       : (prob >= 0.5) == actual,
+        "top1_symptom"  : top3[0][0],
+        "top1_shap_pct" : top3[0][1],
+        "top2_symptom"  : top3[1][0],
+        "top2_shap_pct" : top3[1][1],
+        "top3_symptom"  : top3[2][0],
+        "top3_shap_pct" : top3[2][1],
+    }
+    # Add all individual SHAP % columns
+    for feat, val in zip(FEATURES, shap_row):
+        record[f"shap_{feat}"] = round(val * 100, 2)
+
+    records.append(record)
+
+report_df = pd.DataFrame(records)
+report_df.to_csv("femcare_explainability_report.csv", index=False)
+print("  ✓ femcare_explainability_report.csv")
+
+# ─────────────────────────────────────────────
+# 10. SAMPLE OUTPUT CARD (printed to console)
+# ─────────────────────────────────────────────
+print("\n── Sample Patient Output Card ──")
+sample = records[top_idx]
+tier_colors = {"Urgent": "🔴", "High": "🟠", "Moderate": "🟡", "Low": "🟢"}
+icon = tier_colors[sample["risk_tier"]]
+print(f"\n  {icon}  Risk Score : {sample['risk_pct']}% — {sample['risk_tier'].upper()}")
+print(f"  Actual Diagnosis : {sample['actual_label']}")
+print(f"\n  Main contributors:")
+print(f"    🔴 {sample['top1_symptom']:<35} {sample['top1_shap_pct']:+.1f}%")
+print(f"    🔴 {sample['top2_symptom']:<35} {sample['top2_shap_pct']:+.1f}%")
+print(f"    🟡 {sample['top3_symptom']:<35} {sample['top3_shap_pct']:+.1f}%")
+
+# ─────────────────────────────────────────────
+# 11. FINAL SUMMARY TABLE
+# ─────────────────────────────────────────────
+print("\n" + "=" * 60)
+print("FINAL RESULTS SUMMARY")
 print("=" * 60)
-print("THRESHOLD TUNING — YOUDEN INDEX")
+print(f"  {'Metric':<25} {'Value':>10}")
+print(f"  {'-'*35}")
+print(f"  {'CV-AUC (5-fold)':<25} {cv_scores.mean():>9.4f}")
+print(f"  {'Test AUC':<25} {auc:>9.4f}")
+print(f"  {'Accuracy':<25} {acc:>9.4f}")
+print(f"  {'F1 Score':<25} {f1:>9.4f}")
+print(f"  {'Sensitivity (Recall)':<25} {sensitivity:>9.4f}")
+print(f"  {'Specificity':<25} {specificity:>9.4f}")
+print(f"  {'TP (Endo found)':<25} {tp:>9}")
+print(f"  {'FN (Endo missed)':<25} {fn:>9}")
+print(f"  {'FP (False alarms)':<25} {fp:>9}")
+print(f"  {'TN (Healthy cleared)':<25} {tn:>9}")
 print("=" * 60)
 
-fpr, tpr, thresholds = roc_curve(y_test, y_prob_ada)
-youden_j = tpr - fpr
-best_idx = np.argmax(youden_j)
-best_threshold = thresholds[best_idx]
+print("\n✓ All outputs saved:")
+print("  • shap_importance_bar.png")
+print("  • shap_beeswarm.png")
+print("  • confusion_matrix.png")
+print("  • roc_curve.png")
+print("  • shap_waterfall_sample.png")
+print("  • femcare_explainability_report.csv")
+print("\nDone.\n")
 
-print(f"Default threshold : 0.500")
-print(f"Youden-optimal    : {best_threshold:.4f}")
-print()
-
-y_pred_tuned = (y_prob_ada >= best_threshold).astype(int)
-acc_tuned = accuracy_score(y_test, y_pred_tuned)
-sens_tuned = recall_score(y_test, y_pred_tuned)
-spec_tuned = recall_score(y_test, y_pred_tuned, pos_label=0)
-f1_tuned = f1_score(y_test, y_pred_tuned)
-
-print(f"AdaBoost @ Youden-optimal threshold ({best_threshold:.3f}):")
-print(f"  Accuracy    : {acc_tuned:.4f}")
-print(f"  Sensitivity : {sens_tuned:.4f}")
-print(f"  Specificity : {spec_tuned:.4f}")
-print(f"  F1 Score    : {f1_tuned:.4f}")
-print()
-
-
-# ── 4. COMPARISON TABLE: XGBOOST vs ADABOOST ─────────────────
+# ─────────────────────────────────────────────
+# 12. INTERACTIVE PATIENT PREDICTION
+# ─────────────────────────────────────────────
+print("\n" + "=" * 60)
+print("FEMCARE — PATIENT RISK PREDICTION")
 print("=" * 60)
-print("COMPARISON: XGBOOST (PREVIOUS) vs ADABOOST")
-print("=" * 60)
+print("Answer each question with 1 (Yes) or 0 (No)\n")
 
-# Fill in your previous XGBoost numbers here for the printout
-xgb_results = {
-    'AUC': 0.9225,
-    'Sensitivity': 0.8067,
-    'Specificity': 0.8738,
-    'Accuracy': 0.8378,
-    'F1': 0.8421
+# ── Standard questions (self-reported, required)
+standard_questions = {
+    "Menstrual pain (Dysmenorrhea)"       : "Do you experience painful periods?",
+    "Abnormal uterine bleeding"           : "Do you have abnormal uterine bleeding?",
+    "Pelvic pain"                         : "Do you experience pelvic pain?",
+    "Fever"                               : "Do you get unexplained fevers?",
+    "Nausea"                              : "Do you experience nausea?",
+    "Constipation / Chronic constipation" : "Do you have chronic constipation?",
+    "Abdominal Cramps during Intercourse" : "Do you experience abdominal cramps during intercourse?",
+    "Irregular / Missed periods"          : "Do you have irregular or missed periods?",
+    "Lower back pain"                     : "Do you have lower back pain?",
+    "Bloating"                            : "Do you experience bloating?",
+    "Decreased energy / Exhaustion"       : "Do you feel decreased energy or exhaustion regularly?",
+    "Diarrhea"                            : "Do you experience diarrhea frequently?",
 }
 
-comparison = pd.DataFrame({
-    'XGBoost (previous)': xgb_results,
-    'AdaBoost (default 0.5)': {
-        'AUC': auc_ada, 'Sensitivity': sens_ada, 'Specificity': spec_ada,
-        'Accuracy': acc_ada, 'F1': f1_ada
-    },
-    'AdaBoost (Youden-tuned)': {
-        'AUC': auc_ada, 'Sensitivity': sens_tuned, 'Specificity': spec_tuned,
-        'Accuracy': acc_tuned, 'F1': f1_tuned
-    }
-})
-print(comparison.round(4))
-print()
+# ── Optional questions (require clinical knowledge)
+optional_questions = {
+    "Cysts (unspecified)" : "Have you ever been diagnosed with cysts? (requires prior scan)",
+    "Infertility"         : "Have you been told you may have infertility issues? (requires clinical diagnosis)",
+}
 
+user_input = {}
 
-# ── 5. CONFUSION MATRIX (Youden-tuned) ───────────────────────
-cm = confusion_matrix(y_test, y_pred_tuned)
-tn, fp, fn, tp = cm.ravel()
-print(f"Confusion Matrix (Youden-tuned threshold):")
-print(f"  TP (Endo found)     : {tp}")
-print(f"  FN (Endo missed)    : {fn}")
-print(f"  FP (False alarms)   : {fp}")
-print(f"  TN (Healthy cleared): {tn}")
-print()
+# Collect standard answers
+print("── Section 1: Symptom Questionnaire ──\n")
+for feat, question in standard_questions.items():
+    while True:
+        try:
+            val = int(input(f"  {question} (1/0): "))
+            if val in [0, 1]:
+                user_input[feat] = val
+                break
+            else:
+                print("    ⚠ Please enter 1 or 0 only.")
+        except ValueError:
+            print("    ⚠ Invalid input. Please enter 1 or 0.")
 
+# Collect optional answers — default to 0 if skipped
+print("\n── Section 2: Clinical History (Optional — press Enter to skip) ──\n")
+for feat, question in optional_questions.items():
+    raw = input(f"  {question} (1/0 or Enter to skip): ").strip()
+    if raw == "":
+        user_input[feat] = 0      # default — not clinically confirmed
+        print(f"    → Skipped. Defaulting to 0.")
+    elif raw in ["0", "1"]:
+        user_input[feat] = int(raw)
+    else:
+        user_input[feat] = 0
+        print(f"    → Invalid input. Defaulting to 0.")
 
-# ── 6. SHAP EXPLAINABILITY FOR ADABOOST ──────────────────────
-print("=" * 60)
-print("SHAP EXPLAINABILITY — ADABOOST")
-print("=" * 60)
-print("Note: AdaBoost isn't natively supported by TreeExplainer.")
-print("Using shap.Explainer (Permutation-based, model-agnostic) instead.")
-print("This may take 1-2 minutes for 222 test patients...")
-print()
+# Build input dataframe — must match FEATURES order exactly
+input_df = pd.DataFrame([user_input])[FEATURES]
 
-explainer = shap.Explainer(ada_model.predict_proba, X_train, seed=42)
-shap_values_full = explainer(X_test)
+# Predict
+prob = model.predict_proba(input_df)[0][1]
+tier = risk_tier(prob)
 
-# For binary classification, shap_values_full.values has shape (n_samples, n_features, n_classes)
-# We want class 1 (endometriosis)
-if len(shap_values_full.values.shape) == 3:
-    shap_vals_plot = shap_values_full.values[:, :, 1]
-else:
-    shap_vals_plot = shap_values_full.values
+# SHAP for this patient
+input_shap = explainer(input_df)
+input_sv   = input_shap.values[0]
+ranked     = sorted(zip(FEATURES, input_sv), key=lambda x: abs(x[1]), reverse=True)
 
-# Global summary plot
-plt.figure()
-shap.summary_plot(shap_vals_plot, X_test, feature_names=FINAL_FEATURES,
-                  show=False, plot_size=(10, 6))
-plt.title('SHAP Summary — AdaBoost', fontsize=13, fontweight='bold')
-plt.tight_layout()
-plt.savefig('plot_adaboost_shap_summary.png', dpi=150, bbox_inches='tight')
-plt.close()
-print(">> Saved: plot_adaboost_shap_summary.png")
+# Output card
+tier_colors = {"Urgent": "🔴", "High": "🟠", "Moderate": "🟡", "Low": "🟢"}
+tier_advice = {
+    "Urgent"   : "Please consult a gynaecologist immediately.",
+    "High"     : "We strongly recommend a gynaecological consultation.",
+    "Moderate" : "Consider scheduling a check-up with your doctor.",
+    "Low"      : "Low risk detected. Monitor your symptoms over time."
+}
 
-# Feature importance bar
-plt.figure()
-shap.summary_plot(shap_vals_plot, X_test, feature_names=FINAL_FEATURES,
-                  plot_type='bar', show=False, plot_size=(10, 6))
-plt.title('SHAP Feature Importance — AdaBoost', fontsize=13, fontweight='bold')
-plt.tight_layout()
-plt.savefig('plot_adaboost_shap_bar.png', dpi=150, bbox_inches='tight')
-plt.close()
-print(">> Saved: plot_adaboost_shap_bar.png")
-print()
+print("\n" + "─" * 60)
+print("  FEMCARE RISK ASSESSMENT RESULT")
+print("─" * 60)
+print(f"\n  {tier_colors[tier]}  Risk Score : {prob*100:.1f}% — {tier.upper()}")
+print(f"\n  {tier_advice[tier]}")
+print(f"\n  Top symptoms contributing to your score:")
+for feat, val in ranked[:5]:
+    direction = "↑ raises risk" if val > 0 else "↓ lowers risk"
+    icon = "🔴" if val > 0 else "🟢"
+    print(f"    {icon} {feat:<40} {val*100:+.1f}%  ({direction})")
 
-
-# ── 7. ROC CURVE COMPARISON PLOT ──────────────────────────────
-plt.figure(figsize=(8, 6))
-plt.plot(fpr, tpr, color='#9b59b6', lw=2, label=f'AdaBoost (AUC = {auc_ada:.3f})')
-plt.scatter(fpr[best_idx], tpr[best_idx], color='red', zorder=5,
-            label=f'Youden-optimal point (thr={best_threshold:.3f})')
-plt.plot([0,1],[0,1], color='grey', linestyle=':', lw=1, label='Random Guess')
-plt.xlabel('False Positive Rate', fontsize=11)
-plt.ylabel('True Positive Rate', fontsize=11)
-plt.title('ROC Curve — AdaBoost with Youden-Optimal Threshold', fontsize=13, fontweight='bold')
-plt.legend(fontsize=10)
-plt.tight_layout()
-plt.savefig('plot_adaboost_roc.png', dpi=150)
-plt.close()
-print(">> Saved: plot_adaboost_roc.png")
-print()
-
-
-# ── 8. FINAL SUMMARY ──────────────────────────────────────────
-print("=" * 60)
-print("FINAL SUMMARY")
-print("=" * 60)
-print(f"{'Metric':<15} {'XGBoost':>10} {'AdaBoost(0.5)':>15} {'AdaBoost(tuned)':>17}")
-print("-" * 60)
-print(f"{'AUC':<15} {xgb_results['AUC']:>10.4f} {auc_ada:>15.4f} {auc_ada:>17.4f}")
-print(f"{'Sensitivity':<15} {xgb_results['Sensitivity']:>10.4f} {sens_ada:>15.4f} {sens_tuned:>17.4f}")
-print(f"{'Specificity':<15} {xgb_results['Specificity']:>10.4f} {spec_ada:>15.4f} {spec_tuned:>17.4f}")
-print(f"{'Accuracy':<15} {xgb_results['Accuracy']:>10.4f} {acc_ada:>15.4f} {acc_tuned:>17.4f}")
-print(f"{'F1':<15} {xgb_results['F1']:>10.4f} {f1_ada:>15.4f} {f1_tuned:>17.4f}")
-print()
-print("Output files:")
-print("  plot_adaboost_shap_summary.png")
-print("  plot_adaboost_shap_bar.png")
-print("  plot_adaboost_roc.png")
-print("=" * 60)
+print("\n  ⚠  This is a screening tool only, not a medical diagnosis.")
+print("     Please consult a qualified healthcare professional.")
+print("─" * 60)
