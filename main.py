@@ -47,9 +47,9 @@ app.add_middleware(
 # femcare_features.txt is the source of truth.
 # FEATURES list order must be preserved exactly.
 # ─────────────────────────────────────────────
-model     = joblib.load("femcare_model.pkl")
+model     = joblib.load("femcare_model_final.pkl")
 try:
-    explainer = joblib.load("femcare_explainer.pkl")
+    explainer = joblib.load("Femcares_explainer_final.pkl")
 except Exception as e:
     print("Explainer load failed:", e)
     explainer = None
@@ -73,11 +73,13 @@ with open("femcare_features.txt", "r") as f:
 #   Fever
 #   Loss of appetite
 
+tiers = joblib.load("femcare_tiers_final.pkl")
+
 def risk_tier(prob):
-    if prob >= 0.80:   return "Urgent"
-    elif prob >= 0.60: return "High"
-    elif prob >= 0.40: return "Moderate"
-    else:              return "Low"
+    if prob >= tiers['high_threshold']:     return "Urgent"
+    elif prob >= tiers['moderate_threshold']: return "High"
+    elif prob >= tiers['low_threshold']:    return "Moderate"
+    else:                                   return "Low"
 
 # ─────────────────────────────────────────────
 # DATABASE
@@ -267,7 +269,13 @@ def predict(data: PredictRequest, user_id: str = Depends(get_current_user_option
     tier     = risk_tier(prob)
 
     # Run SHAP
-    raw = explainer(input_df).values
+    try:
+        raw = explainer(input_df).values
+    except Exception:
+    # CalibratedClassifierCV wraps the base estimator
+    # get feature importances from the inner AdaBoost
+        base = model.calibrated_classifiers_[0].estimator
+        raw = np.array(base.feature_importances_).reshape(1, -1)
     if len(raw.shape) == 3:
         shap_vals = raw[0, :, 1]   # class 1 = endometriosis
     else:

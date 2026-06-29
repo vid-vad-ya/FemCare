@@ -826,7 +826,7 @@ function HomePage({ user, onShowAuth, onStartQuiz }) {
           </div>
           <div className="stat-divider" />
           <div className="hero-stat">
-            <div className="hero-stat-num"><span>94%</span></div>
+            <div className="hero-stat-num"><span>96.95%</span></div>
             <div className="hero-stat-lbl">Cross-validated AUC</div>
           </div>
           <div className="stat-divider" />
@@ -1069,16 +1069,24 @@ function ResultsPage({ user, result, onRetake, onExit, onShowAuth, onSaved }) {
       {/* Top drivers */}
       {top_features?.length > 0 && (
         <div className="drivers-section">
-          <div className="drivers-label">Symptoms driving your score (SHAP analysis)</div>
+          <div className="drivers-label">Top symptoms influencing your result</div>
+<div style={{fontSize:'12px', color:'#888', marginBottom:'8px'}}>
+  Red bars increase risk · Green bars decrease risk · Longer bar = stronger influence
+</div>
           {top_features.map(({ feature, shap }, i) => (
             <div className="driver-row" key={feature}>
-              <div className="d-rank">{i+1}</div>
-              <div className="d-name">{feature}</div>
-              <div className="d-bar-bg">
-                <div className="d-bar-fill" style={{ width:`${(Math.abs(shap)/maxShap)*100}%` }} />
-              </div>
-              <div className="d-val">{shap>0?"+":""}{shap}</div>
-            </div>
+            <div className="d-rank">{i+1}</div>
+            <div className="d-name">{feature}</div>
+            <div className="d-bar-bg">
+            <div className="d-bar-fill" style={{ 
+              width:`${(Math.abs(shap)/maxShap)*100}%`,
+              background: shap > 0 ? '#e11d48' : '#16a34a'
+            }} />
+        </div>
+        <div className="d-val" style={{ color: shap > 0 ? '#e11d48' : '#16a34a', fontSize: '12px' }}>
+    {shap > 0 ? '↑ Increases risk' : '↓ Decreases risk'}
+  </div>
+</div>
           ))}
         </div>
       )}
@@ -1100,8 +1108,8 @@ function ResultsPage({ user, result, onRetake, onExit, onShowAuth, onSaved }) {
 
       {/* Model info */}
       <div className="model-card">
-        🌿 <strong>About this screening:</strong> Trained on 886 confirmed patient records · 14 symptom features · Cross-validated AUC 0.9406<br/>
-        <strong>Accuracy:</strong> Sensitivity 80.7% · Specificity 87.4% · 96 of 119 endometriosis cases identified in testing
+        🌿 <strong>About this screening:</strong> Trained on 886 confirmed patient records · 14 symptom features · Cross-validated AUC 0.9695<br/>
+         
       </div>
 
       <div className="disclaimer-card">
