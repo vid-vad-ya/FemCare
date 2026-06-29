@@ -47,9 +47,12 @@ app.add_middleware(
 # femcare_features.txt is the source of truth.
 # FEATURES list order must be preserved exactly.
 # ─────────────────────────────────────────────
-model     = joblib.load("femcare_model.pkl")
+model     = joblib.load("femcare_model_final.pkl")
+THRESHOLD = joblib.load("femcare_threshold_final.pkl")
+tiers     = joblib.load("femcare_tiers_final.pkl")
+
 try:
-    explainer = joblib.load("femcare_explainer.pkl")
+    explainer = joblib.load("Femcares_explainer_final.pkl")
 except Exception as e:
     print("Explainer load failed:", e)
     explainer = None
@@ -76,10 +79,10 @@ with open("femcare_features.txt", "r") as f:
 tiers = joblib.load("femcare_tiers_final.pkl")
 
 def risk_tier(prob):
-    if prob >= tiers['high_threshold']:     return "Urgent"
-    elif prob >= tiers['moderate_threshold']: return "High"
-    elif prob >= tiers['low_threshold']:    return "Moderate"
-    else:                                   return "Low"
+    if prob >= tiers['high_threshold']:        return "Urgent"
+    elif prob >= tiers['moderate_threshold']:  return "High"
+    elif prob >= tiers['low_threshold']:       return "Moderate"
+    else:                                      return "Low"
 
 # ─────────────────────────────────────────────
 # DATABASE
