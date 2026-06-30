@@ -1215,10 +1215,19 @@ export default function App() {
   const [page,      setPage]      = useState("home"); // "home" | "results" | "history"
   const [authModal, setAuthModal] = useState(null);   // null | "login" | "signup"
 
-  const handleLogin = (u) => {
-    setUser(u);
-    setAuthModal(null);
-  };
+  const handleLogin = async (u) => {
+  setUser(u);
+  setAuthModal(null);
+
+  if (result && result.guest && result.answers) {
+    try {
+      const saved = await apiPredict(result.answers, u.token);
+      setResult({ ...saved, answers: result.answers, guest: false });
+    } catch (e) {
+      console.error("Failed to save result after login:", e);
+    }
+  }
+};
   const handleSignOut = () => {
     setUser(null); setResult(null); setPage("home");
   };
