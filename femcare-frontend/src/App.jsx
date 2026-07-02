@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "https://kaviyarose-femcare-backend.hf.space";
 
 const STANDARD_QS = [
   { id: "heavy_bleeding",     feature: "Heavy / Extreme menstrual bleeding", text: "Do you experience heavy or extreme menstrual bleeding?" },
@@ -826,7 +826,7 @@ function HomePage({ user, onShowAuth, onStartQuiz }) {
           </div>
           <div className="stat-divider" />
           <div className="hero-stat">
-            <div className="hero-stat-num"><span>96.95%</span></div>
+            <div className="hero-stat-num"><span>96.93%</span></div>
             <div className="hero-stat-lbl">Cross-validated AUC</div>
           </div>
           <div className="stat-divider" />
@@ -1108,7 +1108,7 @@ function ResultsPage({ user, result, onRetake, onExit, onShowAuth, onSaved }) {
 
       {/* Model info */}
       <div className="model-card">
-        🌿 <strong>About this screening:</strong> Trained on 886 confirmed patient records · 14 symptom features · Cross-validated AUC 0.9695<br/>
+        🌿 <strong>About this screening:</strong> Trained on 886 confirmed patient records · 14 symptom features · Cross-validated AUC 0.9693<br/>
          
       </div>
 

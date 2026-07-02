@@ -26,6 +26,8 @@ from dotenv import load_dotenv
 from passlib.context import CryptContext
 import jwt
 import uvicorn
+from datetime import timezone, timedelta
+IST = timezone(timedelta(hours=5, minutes=30))
 
 load_dotenv()
 
@@ -350,7 +352,7 @@ def history(user_id: str = Depends(get_current_user)):
         shap_rows = cur.fetchall()
         assessments.append({
             "assessment_id" : str(r["id"]),
-            "taken_at"      : r["taken_at"].strftime("%Y-%m-%d %H:%M"),
+            "taken_at" : r["taken_at"].replace(tzinfo=timezone.utc).astimezone(IST).strftime("%Y-%m-%d %I:%M %p IST"),
             "risk_pct"      : r["risk_pct"],
             "risk_tier"     : r["risk_tier"],
             "symptoms"      : r["symptom_inputs"],

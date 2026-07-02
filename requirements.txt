@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+psycopg2-binary
+pydantic
+python-dotenv
+passlib[bcrypt]
+pyjwt
+pandas
+numpy==1.26.4
+scikit-learn==1.9.0
+shap==0.44.1
+joblib
+openpyxl
+python-multipart

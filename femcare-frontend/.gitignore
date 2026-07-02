@@ -24,3 +24,7 @@ dist-ssr
 *.sw?
 regenerate_explainer.py
 test_db.py
+.env
+__pycache__/
+*.pyc
+considerable dataset.xlsx
