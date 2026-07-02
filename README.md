@@ -1,30 +1,75 @@
-# 🌸 FemCare — Early Endometriosis Risk Screening Tool
+# 🌸 FemCare — Early Endometriosis Risk Screening
 
-![Femcare Page](images/femcare.jpeg)
+> An AI-powered web application that screens for endometriosis risk using machine learning and explainable AI.
 
-FemCare is a free, clinically-informed web application that helps women identify whether their symptoms may be consistent with endometriosis. Users answer a short questionnaire about their symptoms and receive a personalised risk report — including a risk score, risk tier, and the specific symptoms contributing most to their result.
-
-> ⚠️ **This is a screening tool, not a medical diagnosis.** FemCare cannot confirm or rule out endometriosis. Always consult a qualified gynaecologist with your results.
+🔗 **Live App:** [https://femcare-k8ty1rx7y-kaviyas-projects-cb95cf97.vercel.app](https://femcare-k8ty1rx7y-kaviyas-projects-cb95cf97.vercel.app)  
+⚙️ **API Docs:** [https://kaviyarose-femcare-backend.hf.space/docs](https://kaviyarose-femcare-backend.hf.space/docs)
 
 ---
 
-## What is Endometriosis?
+## What is FemCare?
 
-Endometriosis is a chronic condition where tissue similar to the uterine lining grows outside the uterus — on the ovaries, fallopian tubes, and surrounding pelvic organs. It affects roughly **190 million women worldwide**, yet the average time from first symptom to diagnosis is **7 to 10 years**. Symptoms are frequently dismissed as "normal period pain."
+Endometriosis affects **1 in 10 women** worldwide, yet the average time from first symptom to diagnosis is **7 to 10 years**. Pain is frequently dismissed as normal period cramps, leading to years of unnecessary suffering.
 
-FemCare was built to help close that gap — giving women a concrete, data-informed starting point for conversations with their doctors.
+FemCare is a free, private, 2-minute screening tool that analyses a patient's symptom pattern against data from 886 confirmed patient records. It gives a personalised risk score and identifies which symptoms are most significant — helping users have an informed conversation with their doctor.
+
+> ⚠️ FemCare is a screening tool only — not a medical diagnosis. Always consult a qualified gynaecologist.
 
 ---
 
 ## Features
 
-- **Symptom questionnaire** — 12 required symptom questions + 2 optional clinical history questions
-- **Risk scoring** — Returns a risk percentage and one of four tiers: Low, Moderate, High, or Urgent
-- **Symptom drivers** — Shows which specific symptoms contributed most to the score
-- **User accounts** — Sign up to save results and track changes over time
-- **Guest mode** — Take the screening without creating an account (results not saved)
-- **Past history** — Logged-in users can review all previous assessments
-- **Fully responsive** — Works on desktop and mobile
+- 🩺 **14-symptom questionnaire** — covers menstrual, pelvic, bowel, and fatigue symptoms
+- 📊 **ML risk prediction** — AdaBoost classifier trained on 886 patient records
+- 🔍 **SHAP explainability** — shows which symptoms drove the result
+- 🏷️ **Risk tiering** — Low / Moderate / High / Urgent with data-derived boundaries
+- 👤 **Auth system** — signup, login, guest mode
+- 📁 **History tracking** — logged-in users can view all past assessments
+- 📱 **Responsive UI** — works on mobile and desktop
+
+---
+
+## Model Details
+
+| Property | Value |
+|---|---|
+| Model | AdaBoostClassifier (Platt Scaling calibrated) |
+| Training data | 886 patient records |
+| Features | 14 clinical symptoms |
+| Test AUC | 0.9535 |
+| Cross-validated AUC | 0.9693 |
+| Accuracy | 89.2% |
+| Sensitivity | 90.8% |
+| Specificity | 87.4% |
+| F1 Score | 0.9000 |
+| Explainability | SHAP (permutation-based) |
+
+### Confusion Matrix — Test Set (222 patients)
+
+|  | Predicted Endo | Predicted Healthy |
+|---|---|---|
+| **Actual Endo** | TP = 108 | FN = 11 |
+| **Actual Healthy** | FP = 13 | TN = 90 |
+
+---
+
+## Risk Tiers
+
+| Tier | Probability | What it means |
+|---|---|---|
+| 🟢 Low | < 6.5% | Symptoms do not strongly align with endometriosis. Continue monitoring. |
+| 🟡 Moderate | 6.5% – 81.5% | Some symptoms present. Consider speaking with a doctor if they persist. |
+| 🟠 High | 81.5% – 99.5% | Several key markers present. A gynaecological consultation is recommended. |
+| 🔴 Urgent | ≥ 99.5% | Strong symptom pattern. Please seek a gynaecological assessment soon. |
+
+> Tier boundaries are data-derived from the calibrated probability distribution of 886 patients.  
+> The Low tier has a Negative Predictive Value of **96.8%** — clinically safe to recommend monitoring.
+
+### Tier Justification
+The thresholds were validated against our test set using three criteria:
+1. Probability distributions of endo vs non-endo patients naturally separate at these boundaries
+2. Endo rate increases monotonically across tiers: 3.6% → 39.0% → 96.4% → 100%
+3. NPV of Low tier = 96.8%, exceeding the 94% clinical safety benchmark used in the SAFE score paper
 
 ---
 
@@ -32,13 +77,14 @@ FemCare was built to help close that gap — giving women a concrete, data-infor
 
 | Layer | Technology |
 |---|---|
-| Frontend | React 19, Vite 8 |
-| Backend | FastAPI (Python) |
-| ML Model | AdaBoost classifier (scikit-learn) |
-| Explainability | SHAP TreeExplainer |
-| Database | PostgreSQL |
-| Auth | JWT (python-jose) + bcrypt |
-| Styling | Inline CSS with CSS variables (no framework) |
+| Frontend | React.js (Vite), single-file component |
+| Backend | FastAPI (Python 3.11) |
+| ML Model | scikit-learn — AdaBoostClassifier |
+| Explainability | SHAP (permutation explainer) |
+| Database | PostgreSQL (Supabase) |
+| Auth | JWT + bcrypt (passlib) |
+| Frontend hosting | Vercel |
+| Backend hosting | Hugging Face Spaces (Docker) |
 
 ---
 
@@ -47,163 +93,96 @@ FemCare was built to help close that gap — giving women a concrete, data-infor
 ```
 FemCare/
 │
-├── main.py                        # FastAPI app — routes, auth, prediction
-├── femcare_model.pkl              # Trained AdaBoost model
-├── femcare_explainer.pkl          # SHAP TreeExplainer
-├── femcare_features.txt           # Single source of truth for feature names
-├── femcare_feature_list.pkl       # Feature list (pickle format)
-├── femcare_full_pipeline.pkl      # Full sklearn pipeline
-├── femcare_xgboost_model.pkl      # XGBoost model (alternate)
-├── femcare_xgboost_shap.py        # XGBoost + SHAP training script
-├── femcare_xgboost_shap_userIO.py # Interactive SHAP exploration
-├── regenerate_explainer.py        # Regenerates femcare_explainer.pkl
-├── femcare_db_query.sql           # Database schema
-├── femcare_explainability_report.csv
-├── considerable dataset.xlsx      # Training dataset
-├── .env                           # Environment variables (never commit this)
+├── main.py                          # FastAPI app — routes, auth, prediction, risk tiering
+├── fix__tiers.py                    # Calibration + data-driven tier boundary generator
+├── regenerate_explainer.py          # Regenerates SHAP explainer if model changes
+├── femcare_evaluate.py              # Standalone script to test model metrics
+│
+├── femcare_model_final.pkl          # Production model — Calibrated AdaBoost
+├── femcare_threshold_final.pkl      # Youden-optimal binary decision threshold
+├── femcare_tiers_final.pkl          # Data-driven tier boundaries
+├── Femcares_explainer_final.pkl     # SHAP permutation explainer
+│
+├── femcare_features.txt             # Single source of truth — 14 production feature names
+├── femcare_db_query.sql             # Database schema
+├── considerable dataset.xlsx        # Training dataset (886 patient records)
+├── requirements.txt                 # Python dependencies
+├── Dockerfile                       # Docker config for Hugging Face deployment
+├── .env                             # Environment variables — never commit this
 │
 ├── femcare-frontend/
 │   ├── src/
-│   │   ├── App.jsx                # Entire frontend (single-file React app)
-│   │   ├── main.jsx               # React entry point
-│   │   ├── App.css                # Legacy CSS (mostly unused)
-│   │   └── index.css              # Base reset styles
+│   │   ├── App.jsx                  # Entire frontend (single-file React app)
+│   │   ├── main.jsx                 # React entry point
+│   │   └── index.css                # Base styles
 │   ├── index.html
 │   ├── vite.config.js
-│   ├── package.json
-│   └── eslint.config.js
+│   └── package.json
 │
-└── [plot files]                   # Model evaluation charts (ROC, SHAP, etc.)
+└── plots/                           # Model evaluation charts
+    ├── plot_calibration.png
+    ├── plot_tier_fixed.png
+    ├── plot_A_model_comparison.png
+    ├── plot_B_roc_curves.png
+    └── ...
 ```
-
----
-
-## Model Performance
-
-The risk scoring model is an AdaBoost classifier trained on **886 patient records** with **14 symptom features**.
-
-| Metric | Score |
-|---|---|
-| AUC Test | 0.9541 |
-| Cross-validated AUC | 0.9695 |
-| Sensitivity (recall) | 87.39% |
-| Specificity | 89.32% |
-| Accuracy | 88.3% |
-| F1 Score | 88.89% |
-
-
-Feature importance and per-prediction explanations are generated using **SHAP (SHapley Additive exPlanations)**, which identifies which symptoms are driving each individual score.
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- Python 3.9+
-- Node.js 18+
-- PostgreSQL
-
----
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/your-username/femcare.git
-cd femcare
-```
-
----
-
-### 2. Backend setup
-
-```bash
-# Create and activate a virtual environment
-python -m venv venv
-source venv/bin/activate        # Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-Create a `.env` file in the project root:
-
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=femcare
-DB_USER=your_db_user
-DB_PASSWORD=your_db_password
-```
-
-Set up the database:
-
-```bash
-psql -U your_db_user -d femcare -f femcare_db_query.sql
-```
-
-Start the backend:
-
-```bash
-uvicorn main:app --reload
-# Runs at http://localhost:8000
-```
-
----
-
-### 3. Frontend setup
-
-```bash
-cd femcare-frontend
-npm install
-npm run dev
-# Runs at http://localhost:5173
-```
-
-Open `http://localhost:5173` in your browser.
 
 ---
 
 ## API Endpoints
 
-| Method | Endpoint | Description | Auth required |
+| Method | Endpoint | Auth | Description |
 |---|---|---|---|
-| `POST` | `/signup` | Create a new account | No |
-| `POST` | `/login` | Sign in, returns JWT token | No |
-| `POST` | `/predict` | Submit answers, get risk score | No (optional) |
-| `GET` | `/history` | Fetch all past assessments | Yes |
+| POST | `/signup` | None | Create a new account |
+| POST | `/login` | None | Login and receive JWT token |
+| POST | `/predict` | Optional | Run symptom prediction (works for guests too) |
+| GET | `/history` | Required | Get all past assessments for logged-in user |
 
 ---
 
-## Risk Tiers
+## Running Locally
 
-| Tier | Risk % | What it means |
-|---|---|---|
-| 🟢 Low | < 40% | Symptoms do not strongly align with endometriosis. Continue monitoring. |
-| 🟣 Moderate | 40–59% | Some symptoms present. Consider speaking with a doctor if they persist. |
-| 🔴 High | 60–79% | Several markers present. A gynaecological consultation is recommended. |
-| 🟤 Urgent | ≥ 80% | Strong symptom pattern. Please seek a gynaecological assessment soon. |
+### Backend
+```bash
+cd FemCare
+pip install -r requirements.txt
+uvicorn main:app --reload
+```
+
+### Frontend
+```bash
+cd femcare-frontend
+npm install
+npm run dev
+```
+
+Make sure your `.env` file has:
+```
+DB_HOST=your_host
+DB_PORT=5432
+DB_NAME=postgres
+DB_USER=postgres
+DB_PASSWORD=your_password
+```
 
 ---
 
-## Environment Variables
+## Deployment
 
-| Variable | Description |
+| Service | Platform |
 |---|---|
-| `DB_HOST` | PostgreSQL host |
-| `DB_PORT` | PostgreSQL port (default 5432) |
-| `DB_NAME` | Database name |
-| `DB_USER` | Database user |
-| `DB_PASSWORD` | Database password |
+| Frontend | Vercel (drag and drop `dist`) |
+| Backend | Hugging Face Spaces (Docker) |
+| Database | Supabase (free PostgreSQL) |
 
 ---
 
 ## Disclaimer
 
-FemCare is a research and educational screening tool. It is **does not provide clinical diagnoses**. The risk score reflects statistical patterns in symptom data — it does not confirm or exclude endometriosis. Always share your results with a qualified healthcare professional.
+FemCare is a research and screening tool built for educational purposes. It is **not a substitute for medical advice, diagnosis, or treatment**. Always seek the guidance of a qualified gynaecologist or healthcare provider with any questions you may have regarding a medical condition.
 
 ---
 
 ## License
 
-This project is for educational and research purposes.
+This project is for Educational and Research Purposes only.
