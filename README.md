@@ -2,7 +2,7 @@
 
 > An AI-powered web application that screens for endometriosis risk using machine learning and explainable AI.
 
-🔗 **Live App:** [https://femcare-k8ty1rx7y-kaviyas-projects-cb95cf97.vercel.app](https://femcare-k8ty1rx7y-kaviyas-projects-cb95cf97.vercel.app)  
+🔗 **Live App:** [https://femcare-chi.vercel.app/](https://femcare-chi.vercel.app/)  
 ⚙️ **API Docs:** [https://kaviyarose-femcare-backend.hf.space/docs](https://kaviyarose-femcare-backend.hf.space/docs)
 
 ---
